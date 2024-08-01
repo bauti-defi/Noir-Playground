@@ -1,4 +1,3 @@
-use dep::std;
 use std::collections::map::HashMap;
 use std::hash::BuildHasherDefault;
 use std::hash::keccak256;
@@ -13,82 +12,54 @@ struct Call {
     targetSelector: Field,
 }
 
-fn keccak256_call(call: Call) -> [u8; 32] {
-    call.operator.assert_max_bit_size(160);
-    call.target.assert_max_bit_size(160);
-    call.beforeTrxHook.assert_max_bit_size(160);
-    call.afterTrxHook.assert_max_bit_size(160);
-    call.operation.assert_max_bit_size(8);
-    call.targetSelector.assert_max_bit_size(32);
+impl Call {
 
-    let operatorBytes = call.operator.to_be_bytes(32);
-    let targetBytes = call.target.to_be_bytes(32);
-    let beforeTrxHookBytes = call.beforeTrxHook.to_be_bytes(32);
-    let afterTrxHookBytes = call.afterTrxHook.to_be_bytes(32);
-    let operationBytes = call.operation.to_be_bytes(32);
-    let targetSelectorBytes = call.targetSelector.to_be_bytes(4);
+    fn keccak256(self) -> [u8; 32] {
+        self.operator.assert_max_bit_size(160);
+        self.target.assert_max_bit_size(160);
+        self.beforeTrxHook.assert_max_bit_size(160);
+        self.afterTrxHook.assert_max_bit_size(160);
+        self.operation.assert_max_bit_size(8);
+        self.targetSelector.assert_max_bit_size(32);
 
-    /// solidity left aligns selectors so we need to pad it with 0s
-    let targetSelectorPaddingBytes = [0; 28];
+        let operatorBytes = self.operator.to_be_bytes(32);
+        let targetBytes = self.target.to_be_bytes(32);
+        let beforeTrxHookBytes = self.beforeTrxHook.to_be_bytes(32);
+        let afterTrxHookBytes = self.afterTrxHook.to_be_bytes(32);
+        let operationBytes = self.operation.to_be_bytes(32);
+        let targetSelectorBytes = self.targetSelector.to_be_bytes(4);
 
-    let mut callBytes: [u8; 192] = [0; 192];
+        let mut callBytes: [u8; 192] = [0; 192];
 
-    for i in 0..32 {
-        callBytes[i] = operatorBytes[i];
+        for i in 0..32 {
+            callBytes[i] = operatorBytes[i];
+            callBytes[i + 32] = targetBytes[i];
+            callBytes[i + 64] = beforeTrxHookBytes[i];
+            callBytes[i + 96] = afterTrxHookBytes[i];
+            callBytes[i + 128] = operationBytes[i];
+        }
+
+        for i in 0..4 {
+            callBytes[i + 160] = targetSelectorBytes[i];
+        }
+
+        let hash = keccak256(callBytes, 192);
+
+        hash
     }
-
-    for i in 0..32 {
-        callBytes[i + 32] = targetBytes[i];
-    }
-
-    for i in 0..32 {
-        callBytes[i + 64] = beforeTrxHookBytes[i];
-    }
-
-    for i in 0..32 {
-        callBytes[i + 96] = afterTrxHookBytes[i];
-    }
-
-    for i in 0..32 {
-        callBytes[i + 128] = operationBytes[i];
-    }
-
-    for i in 0..4 {
-        callBytes[i + 160] = targetSelectorBytes[i];
-    }
-
-    for i in 0..28 {
-        callBytes[i + 164] = targetSelectorPaddingBytes[i];
-    }
-
-    let hash = keccak256(callBytes, 192);
-
-    hash
-}
-
-pub fn call_config_map(calls: [Call; 3]) -> HashMap<[u8 ; 32], bool, 3, BuildHasherDefault<Poseidon2Hasher>> {
-    // @notice defaults to max size of 3
-    let mut mapping: HashMap<[u8 ; 32], bool, 3, BuildHasherDefault<Poseidon2Hasher>> = HashMap::default();
-
-    for call in calls {
-        assert(!mapping.contains_key(keccak256_call(call)), "Duplicate call");
-        mapping.insert(keccak256_call(call), true);
-    }
-
-    mapping
 }
 
 fn main(callWhitelist: [Call; 3], call: pub Call) {
     // @notice defaults to max size of 3
     let mut mapping: HashMap<[u8 ; 32], bool, 3, BuildHasherDefault<Poseidon2Hasher>> = HashMap::default();
 
-    for call in callWhitelist {
-        let hash = keccak256_call(call);
+    for _call in callWhitelist {
+        let hash = _call.keccak256();
         assert(!mapping.contains_key(hash), "Duplicate call");
         mapping.insert(hash, true);
     }
 
-    assert(mapping.contains_key(keccak256_call(call)), "Call not whitelisted");
+    assert(mapping.contains_key(call.keccak256()), "Call not whitelisted");
 }
 
 #[test]
@@ -134,7 +105,7 @@ fn test_keccak256_call() {
         targetSelector: 0x12345678
     };
 
-    let hash = keccak256_call(call);
+    let hash = call.keccak256();
 
     /// calculated using foundry 
     assert_eq(
