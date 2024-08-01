@@ -61,8 +61,6 @@ fn keccak256_call(call: Call) -> [u8; 32] {
         callBytes[i + 164] = targetSelectorPaddingBytes[i];
     }
 
-    println(callBytes);
-
     let hash = keccak256(callBytes, 192);
 
     hash
@@ -87,7 +85,7 @@ fn main(callWhitelist: [Call; 3], call: pub Call) {
     for call in callWhitelist {
         let hash = keccak256_call(call);
         assert(!mapping.contains_key(hash), "Duplicate call");
-        mapping.insert(keccak256_call(call), true);
+        mapping.insert(hash, true);
     }
 
     assert(mapping.contains_key(keccak256_call(call)), "Call not whitelisted");
