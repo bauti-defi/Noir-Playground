@@ -14,7 +14,7 @@ struct Call {
 
 impl Call {
 
-    fn keccak256(self) -> [u8; 32] {
+    unconstrained fn keccak256(self) -> [u8; 32] {
         self.operator.assert_max_bit_size(160);
         self.target.assert_max_bit_size(160);
         self.beforeTrxHook.assert_max_bit_size(160);
@@ -49,8 +49,7 @@ impl Call {
     }
 }
 
-fn main(callWhitelist: [Call; 3], call: pub Call) {
-    // @notice defaults to max size of 3
+fn create_mapping(callWhitelist: [Call; 3]) -> HashMap<[u8 ; 32], bool, 3, BuildHasherDefault<Poseidon2Hasher>> {
     let mut mapping: HashMap<[u8 ; 32], bool, 3, BuildHasherDefault<Poseidon2Hasher>> = HashMap::default();
 
     for _call in callWhitelist {
@@ -58,6 +57,13 @@ fn main(callWhitelist: [Call; 3], call: pub Call) {
         assert(!mapping.contains_key(hash), "Duplicate call");
         mapping.insert(hash, true);
     }
+
+    mapping
+}
+
+fn main(callWhitelist: [Call; 3], call: pub Call) {
+    // @notice defaults to max size of 3
+    let mapping: HashMap<[u8 ; 32], bool, 3, BuildHasherDefault<Poseidon2Hasher>> = create_mapping(callWhitelist);
 
     assert(mapping.contains_key(call.keccak256()), "Call not whitelisted");
 }
